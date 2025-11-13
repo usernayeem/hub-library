@@ -10,46 +10,65 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 
-// Create authentication context
 export const AuthContext = createContext();
 const auth = getAuth(app);
 
 export const AuthProvider = ({ children }) => {
-  // State for current user and loading status
   const [user, setUser] = useState();
   const [loading, setLoading] = useState(true);
 
-  // Register new user with email and password
   const registerUser = (email, password) => {
     setLoading(true);
     return createUserWithEmailAndPassword(auth, email, password);
   };
 
-  // Login existing user with email and password
-  const Login = (email, password) => {
+  const loginUser = (email, password) => {
     setLoading(true);
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  // Google auth provider setup
   const provider = new GoogleAuthProvider();
 
-  // Login with Google popup
   const googleAuth = () => {
     setLoading(true);
     return signInWithPopup(auth, provider);
   };
 
-  // Logout current user
   const Logout = () => {
     setLoading(true);
     return signOut(auth);
   };
 
-  // Listen for authentication state changes
+  const fetchUserRole = async (uid) => {
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+    try {
+      const response = await fetch(`${apiUrl}/api/users/${uid}`);
+
+      if (!response.ok) {
+        console.error("Failed to fetch user role");
+        return null;
+      }
+
+      const userData = await response.json();
+      return userData.role || "viewer";
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      return "viewer";
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        const role = await fetchUserRole(currentUser.uid);
+        setUser({
+          ...currentUser,
+          role: role,
+        });
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -58,13 +77,12 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // Context value object with auth methods and state
   const userData = {
     auth,
     user,
     setUser,
     registerUser,
-    Login,
+    loginUser,
     Logout,
     googleAuth,
     loading,
